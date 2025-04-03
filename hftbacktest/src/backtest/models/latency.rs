@@ -17,6 +17,9 @@ pub trait LatencyModel {
 
     /// Returns the order response latency for the given timestamp and order.
     fn response(&mut self, timestamp: i64, order: &Order) -> i64;
+
+    /// Return new order response latency for the given timestamp and order.
+    fn new_order_response(&mut self, timestamp: i64, order: &Order) -> i64;  
 }
 
 /// Provides constant order latency.
@@ -28,6 +31,7 @@ pub trait LatencyModel {
 pub struct ConstantLatency {
     entry_latency: i64,
     response_latency: i64,
+    new_order_response_latency: i64,
 }
 
 impl ConstantLatency {
@@ -36,10 +40,11 @@ impl ConstantLatency {
     /// `entry_latency` and `response_latency` should match the time unit of the data's timestamps.
     /// Using nanoseconds across all datasets is recommended, since the live
     /// [Bot](crate::live::LiveBot) uses nanoseconds.
-    pub fn new(entry_latency: i64, response_latency: i64) -> Self {
+    pub fn new(entry_latency: i64, response_latency: i64, new_order_response_latency: i64) -> Self {
         Self {
             entry_latency,
             response_latency,
+            new_order_response_latency,
         }
     }
 }
@@ -51,6 +56,9 @@ impl LatencyModel for ConstantLatency {
 
     fn response(&mut self, _timestamp: i64, _order: &Order) -> i64 {
         self.response_latency
+    }
+    fn new_order_response(&mut self, _timestamp: i64, _order: &Order) -> i64 {
+        self.new_order_response_latency
     }
 }
 
@@ -238,6 +246,7 @@ impl LatencyModel for IntpOrderLatency {
         if timestamp < first_row.exch_ts {
             return first_row.resp_ts - first_row.exch_ts;
         }
+        
 
         loop {
             let row = &self.data[self.resp_rn];
@@ -271,7 +280,47 @@ impl LatencyModel for IntpOrderLatency {
             }
         }
     }
-}
+
+    fn new_order_response(&mut self, timestamp: i64, _order: &Order) -> i64 {
+        let first_row = &self.data[0];
+        if timestamp < first_row.exch_ts {
+            return first_row.resp_ts - first_row.exch_ts;
+        }
+        
+
+        loop {
+            let row = &self.data[self.resp_rn];
+            let next_row = if self.resp_rn + 1 < self.data.len() {
+                &self.data[self.resp_rn + 1]
+            } else if !self.next_data.is_empty() {
+                &self.next_data[0]
+            } else {
+                let last_row = &self.data[self.data.len() - 1];
+                return last_row.resp_ts - last_row.exch_ts;
+            };
+
+            let exch_timestamp = row.exch_ts;
+            let next_exch_timestamp = next_row.exch_ts;
+            if exch_timestamp <= timestamp && timestamp < next_exch_timestamp {
+                let resp_local_timestamp = row.resp_ts;
+                let next_resp_local_timestamp = next_row.resp_ts;
+
+                let lat1 = resp_local_timestamp - exch_timestamp;
+                let lat2 = next_resp_local_timestamp - next_exch_timestamp;
+
+                let lat = self.intp(timestamp, exch_timestamp, lat1, next_exch_timestamp, lat2);
+                assert!(lat >= 0);
+                return lat;
+            } else if self.resp_rn == self.data.len() - 1 {
+                if self.next_data().unwrap() {
+                    self.resp_rn = 0;
+                }
+            } else {
+                self.resp_rn += 1;
+            }
+        }
+    }
+    }
 
 #[derive(Clone)]
 struct OrderLatencyAdjustment {

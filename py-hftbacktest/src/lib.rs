@@ -66,6 +66,7 @@ pub enum LatencyModel {
     ConstantLatency {
         entry_latency: i64,
         resp_latency: i64,
+        new_order_response_latency: i64,
     },
     IntpOrderLatency {
         data: Vec<DataSource<OrderLatencyRow>>,
@@ -130,6 +131,7 @@ impl BacktestAsset {
             latency_model: LatencyModel::ConstantLatency {
                 entry_latency: 0,
                 resp_latency: 0,
+                new_order_response_latency: 0,
             },
             asset_type: AssetType::LinearAsset { contract_size: 1.0 },
             queue_model: QueueModel::LogProbQueueModel2 {},
@@ -229,14 +231,17 @@ impl BacktestAsset {
     /// Args:
     ///     entry_latency: order entry latency.
     ///     resp_latency: order response latency.
+    ///     new_order_response_latency: New Order response latency.
     pub fn constant_latency(
         mut slf: PyRefMut<Self>,
         entry_latency: i64,
         resp_latency: i64,
+        new_order_response_latency: i64,
     ) -> PyRefMut<Self> {
         slf.latency_model = LatencyModel::ConstantLatency {
             entry_latency,
             resp_latency,
+            new_order_response_latency,
         };
         slf
     }
@@ -496,7 +501,8 @@ pub fn build_hashmap_backtest(assets: Vec<PyRefMut<BacktestAsset>>) -> PyResult<
             [
                 ConstantLatency {
                     entry_latency,
-                    resp_latency
+                    resp_latency,
+                    new_order_response_latency
                 },
                 IntpOrderLatency {
                     data,
@@ -553,7 +559,8 @@ pub fn build_roivec_backtest(assets: Vec<PyRefMut<BacktestAsset>>) -> PyResult<u
             [
                 ConstantLatency {
                     entry_latency,
-                    resp_latency
+                    resp_latency,
+                    new_order_response_latency
                 },
                 IntpOrderLatency {
                     data,
