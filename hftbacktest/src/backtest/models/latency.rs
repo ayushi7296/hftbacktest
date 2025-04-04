@@ -18,8 +18,8 @@ pub trait LatencyModel {
     /// Returns the order response latency for the given timestamp and order.
     fn response(&mut self, timestamp: i64, order: &Order) -> i64;
 
-    /// Return new order response latency for the given timestamp and order.
-    fn new_order_response(&mut self, timestamp: i64, order: &Order) -> i64;  
+    /// Return async order response latency for the given timestamp and order.
+    fn async_order_response(&mut self, timestamp: i64, order: &Order) -> i64;  
 }
 
 /// Provides constant order latency.
@@ -31,7 +31,7 @@ pub trait LatencyModel {
 pub struct ConstantLatency {
     entry_latency: i64,
     response_latency: i64,
-    new_order_response_latency: i64,
+    async_order_response_latency: i64,
 }
 
 impl ConstantLatency {
@@ -40,11 +40,11 @@ impl ConstantLatency {
     /// `entry_latency` and `response_latency` should match the time unit of the data's timestamps.
     /// Using nanoseconds across all datasets is recommended, since the live
     /// [Bot](crate::live::LiveBot) uses nanoseconds.
-    pub fn new(entry_latency: i64, response_latency: i64, new_order_response_latency: i64) -> Self {
+    pub fn new(entry_latency: i64, response_latency: i64, async_order_response_latency: i64) -> Self {
         Self {
             entry_latency,
             response_latency,
-            new_order_response_latency,
+            async_order_response_latency,
         }
     }
 }
@@ -57,8 +57,8 @@ impl LatencyModel for ConstantLatency {
     fn response(&mut self, _timestamp: i64, _order: &Order) -> i64 {
         self.response_latency
     }
-    fn new_order_response(&mut self, _timestamp: i64, _order: &Order) -> i64 {
-        self.new_order_response_latency
+    fn async_order_response(&mut self, _timestamp: i64, _order: &Order) -> i64 {
+        self.async_order_response_latency
     }
 }
 
@@ -281,7 +281,7 @@ impl LatencyModel for IntpOrderLatency {
         }
     }
 
-    fn new_order_response(&mut self, timestamp: i64, _order: &Order) -> i64 {
+    fn async_order_response(&mut self, timestamp: i64, _order: &Order) -> i64 {
         let first_row = &self.data[0];
         if timestamp < first_row.exch_ts {
             return first_row.resp_ts - first_row.exch_ts;

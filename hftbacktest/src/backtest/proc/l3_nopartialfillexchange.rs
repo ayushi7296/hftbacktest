@@ -105,9 +105,9 @@ where
             order.exch_timestamp + self.order_latency.response(timestamp, &order);
         self.orders_to.append(order, local_recv_timestamp);
     }
-    fn make_response_new_order(&mut self, order: Order, timestamp: i64) {
+    fn make_response_async_order(&mut self, order: Order, timestamp: i64) {
         let local_recv_timestamp =
-            order.exch_timestamp + self.order_latency.new_order_response(timestamp, &order);
+            order.exch_timestamp + self.order_latency.async_order_response(timestamp, &order);
         self.orders_to.append(order, local_recv_timestamp);
     }
 
@@ -121,7 +121,7 @@ where
             order.req = Status::None;
             self.ack_new(&mut order, recv_timestamp)?;
             // Makes the response.
-            self.make_response_new_order(order, recv_timestamp);
+            self.make_response_async_order(order, recv_timestamp);
         }
         // Processes a cancel order.
         else if order.req == Status::Canceled {

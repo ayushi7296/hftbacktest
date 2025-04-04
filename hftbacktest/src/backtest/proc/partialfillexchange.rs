@@ -136,6 +136,11 @@ where
             order.exch_timestamp + self.order_latency.response(timestamp, &order);
         self.orders_to.append(order, local_recv_timestamp);
     }
+    fn make_response_async_order(&mut self, order: Order, timestamp: i64) {
+        let local_recv_timestamp =
+            order.exch_timestamp + self.order_latency.async_order_response(timestamp, &order);
+        self.orders_to.append(order, local_recv_timestamp);
+    }
 
     fn process_recv_order_(
         &mut self,
@@ -146,21 +151,28 @@ where
         if order.req == Status::New {
             order.req = Status::None;
             self.ack_new(&mut order, recv_timestamp)?;
+            // Makes the response.
+            self.make_response_async_order(order, recv_timestamp);
         }
         // Processes a cancel order.
         else if order.req == Status::Canceled {
             order.req = Status::None;
             self.ack_cancel(&mut order, recv_timestamp)?;
+            // Makes the response.
+            self.make_response(order, recv_timestamp);
         }
         // Processes a modify order.
         else if order.req == Status::Replaced {
             order.req = Status::None;
             self.ack_modify::<false>(&mut order, recv_timestamp)?;
+            // Makes the response.
+            self.make_response(order, recv_timestamp);
         } else {
+            // Makes the response.
+            self.make_response(order, recv_timestamp);
             return Err(BacktestError::InvalidOrderRequest);
         }
-        // Makes the response.
-        self.make_response(order, recv_timestamp);
+
         Ok(())
     }
 
